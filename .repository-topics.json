@@ -1,0 +1,11 @@
+[
+  "aggregation",
+  "cli",
+  "discovery",
+  "events",
+  "evgl",
+  "flags-2-env",
+  "geospatial",
+  "rust",
+  "websocket"
+]

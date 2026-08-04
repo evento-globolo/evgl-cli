@@ -1,0 +1,35 @@
+[help]
+url = "https://github.com/evento-globolo/evgl-cli"
+
+[env]
+ignore = ["EVGL_API_TOKEN"]
+
+[flags.api_url]
+type = "string"
+env = "EVGL_API_URL"
+default = "http://127.0.0.1:8080"
+aliases = ["api-url"]
+help = "Base URL for the Evento Globolo API."
+
+[flags.timeout_seconds]
+type = "integer"
+env = "EVGL_TIMEOUT_SECONDS"
+default = 20
+aliases = ["timeout-seconds"]
+help = "HTTP timeout in seconds."
+
+[flags.output]
+type = "string"
+env = "EVGL_OUTPUT"
+default = "json"
+aliases = ["output"]
+help = "Output mode: json or text."
+
+[commands.health]
+description = "Check API health"
+
+[commands.list]
+description = "List events"
+
+[commands.watch]
+description = "Watch WebSocket events"
