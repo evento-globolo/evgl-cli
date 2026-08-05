@@ -2,10 +2,21 @@
 name = "evgl-cli"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "flags-2-env operator CLI for Evento Globolo health, listing, record lookup, and WebSocket watching."
+repository = "https://github.com/evento-globolo/evgl-cli"
 publish = false
 
-[package.metadata.flags-2-env]
-upstream = "https://github.com/ORESoftware/flags-2-env"
-
 [dependencies]
-clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+flags2env = { git = "https://github.com/ORESoftware/flags-2-env", rev = "b596f2d1c99bd726b262a923916e3015bc80bc37", package = "flags2env" }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
