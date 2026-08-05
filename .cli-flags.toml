@@ -1,35 +1,49 @@
 [help]
 url = "https://github.com/evento-globolo/evgl-cli"
+columns = ["options", "env", "type", "default", "description"]
+
+[parse]
+command_env = "EVGL_COMMAND"
+errors_env = "EVGL_PARSE_ERRORS"
+unknown_options_env = "EVGL_UNKNOWN_OPTIONS"
 
 [env]
-ignore = ["EVGL_API_TOKEN"]
+ignore = ["EVGL_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"]
 
-[flags.api_url]
+[flags.base_url]
+env = "EVGL_BASE_URL"
+aliases = ["base-url"]
 type = "string"
-env = "EVGL_API_URL"
 default = "http://127.0.0.1:8080"
-aliases = ["api-url"]
 help = "Base URL for the Evento Globolo API."
 
 [flags.timeout_seconds]
-type = "integer"
 env = "EVGL_TIMEOUT_SECONDS"
-default = 20
 aliases = ["timeout-seconds"]
+type = "integer"
+default = 20
 help = "HTTP timeout in seconds."
 
 [flags.output]
-type = "string"
 env = "EVGL_OUTPUT"
-default = "json"
 aliases = ["output"]
+type = "string"
+default = "json"
 help = "Output mode: json or text."
 
 [commands.health]
-description = "Check API health"
+help = "Check API health."
 
 [commands.list]
-description = "List events"
+help = "List events."
+
+[commands.get]
+help = "Get one event."
+[commands.get.flags.id]
+env = "EVGL_ID"
+aliases = ["id"]
+type = "string"
+help = "Event UUID."
 
 [commands.watch]
-description = "Watch WebSocket events"
+help = "Watch the API WebSocket event stream."
