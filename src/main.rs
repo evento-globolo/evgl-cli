@@ -3,6 +3,23 @@ use flags2env::BundledFlags2Env;
 use futures_util::StreamExt;
 use tokio_tungstenite::connect_async;
 
+const HELP: &str = "evgl-cli 0.1.0\n\nUsage: evgl-cli [options] <command>\n\nCommands:\n  health  Check the Evento Globolo API\n  list    List events\n  get     Read one event; requires --id\n  watch   Stream event updates\n\nOptions:\n  -h, --help       Print this help\n  -V, --version    Print the CLI version\n\nConfiguration flags are defined in .cli-flags.toml.\n";
+const VERSION: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n");
+
+fn informational_output<I, S>(arguments: I) -> Option<&'static str>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    arguments
+        .into_iter()
+        .find_map(|argument| match argument.as_ref() {
+            "-h" | "--help" => Some(HELP),
+            "-V" | "--version" => Some(VERSION),
+            _ => None,
+        })
+}
+
 fn apply_flags() -> anyhow::Result<String> {
     let parser = BundledFlags2Env::new();
     parser
@@ -30,9 +47,13 @@ fn apply_flags() -> anyhow::Result<String> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if let Some(output) = informational_output(std::env::args().skip(1)) {
+        print!("{output}");
+        return Ok(());
+    }
+
     let command = apply_flags()?;
-    let base = std::env::var("EVGL_BASE_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:8080".into());
+    let base = std::env::var("EVGL_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
     let timeout = std::env::var("EVGL_TIMEOUT_SECONDS")
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
@@ -46,11 +67,7 @@ async fn main() -> anyhow::Result<()> {
 
     match command.as_str() {
         "health" => {
-            print_response(
-                client.get(format!("{base}/healthz")).send().await?,
-                &output,
-            )
-            .await
+            print_response(client.get(format!("{base}/healthz")).send().await?, &output).await
         }
         "list" => {
             print_response(
@@ -117,6 +134,14 @@ async fn watch(base: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn help_and_version_are_available_without_configuration_or_network() {
+        assert_eq!(informational_output(["--help"]), Some(HELP));
+        assert_eq!(informational_output(["-h"]), Some(HELP));
+        assert_eq!(informational_output(["--version"]), Some(VERSION));
+        assert_eq!(informational_output(["health"]), None);
+    }
 
     #[test]
     fn websocket_url_maps_http_schemes_and_normalizes_trailing_slashes() {
