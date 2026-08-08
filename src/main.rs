@@ -1,4 +1,4 @@
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use flags2env::BundledFlags2Env;
 use futures_util::StreamExt;
 use tokio_tungstenite::connect_async;
