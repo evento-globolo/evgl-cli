@@ -31,8 +31,7 @@ fn apply_flags() -> anyhow::Result<String> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let command = apply_flags()?;
-    let base = std::env::var("EVGL_BASE_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:8080".into());
+    let base = std::env::var("EVGL_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
     let timeout = std::env::var("EVGL_TIMEOUT_SECONDS")
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
@@ -46,11 +45,7 @@ async fn main() -> anyhow::Result<()> {
 
     match command.as_str() {
         "health" => {
-            print_response(
-                client.get(format!("{base}/healthz")).send().await?,
-                &output,
-            )
-            .await
+            print_response(client.get(format!("{base}/healthz")).send().await?, &output).await
         }
         "list" => {
             print_response(
