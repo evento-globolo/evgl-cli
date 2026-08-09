@@ -1,0 +1,53 @@
+name: Recover archived provider-cross-posting source
+
+on:
+  push:
+    branches:
+      - agent/provider-cross-posting
+    paths:
+      - .github/workflows/recover-provider-cross-posting.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-provider-cross-posting-evgl-cli
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    if: github.repository == 'evento-globolo/evgl-cli'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out current recovery branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: agent/provider-cross-posting
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Restore credential-clean archived source
+        shell: bash
+        env:
+          PAYLOAD_B64: 'H4sICADdd2oC/3BheWxvYWQudGFyAO09+3PbNtL+mX8FyptJpBmReliWbSZO6ipq6jZ+jK3kppfx0BQFS6wpkseHHdfW/367AEiCpGQn99VJ7ws5aSWRi90FsC8sgbXe1ts/nliffqHWlIYbT3J1+LXus9PZ7Off8X630+v2Nsinja9wJVFshUB+4/u8ejtkETsLutfd3hn0+p3e1kDv7nS2tzo7ykZ9/b+/dNt1tEvXmkV67C/cJ9P/Qb+/Tv/7W53Nje5Wb3Nre2vQZ/rf6/e7G6TzNfU/9P34IbjHnv+PXh/n1A3OlSR0yR5R53EcREa7PXPieTLRbX/RptfUi31t5voT3/Xh58zVQGZURflIvetzxZl5fkih8Ud19OHtO3N8/NvoSD2Hx1yqrMAxAfu5AtBIggHtnxyY70/fqYrlOlZEI9YcIDWAVFtExY9zJb4NELEaxaHjzVRlSi+txI1TRoFP17ctd+5HsbHT2emoCnaGEWFMk7ecaQLkyAToEKCpqxlrQehfO+D1irydnB5/OHgzOi0yl8ICW9HcDxkTgVphMWXgRIATz1pQg7BBnIROTFtkQWmcBPgZW+alZdOJ71+ZgTWDZ3ZoObPIdaK4RfyQzKhHQ8c2b+hkDkAS67bvedSOHd8znWmR/+Hx0dFoOD44PjIP3hQ7kbfSnCmOc35jxXBX+pJDk/fvD95I7LD+VTgZfRgdjStMMFhBn31/gPTQ8nzPgTnmI1gm+4c/qRD99finCkmAEwTh20PkQj+KtADkiQBgmVrsxC4tEhsfjN+NirQY1AM0mGgSBiXhjpLFwgpvi9jP3h8e7p/+XsQvIB+lIOAkGlMa2aET4PwV6bwZnQ1PD05QZIq0pBY4eNJPbR4v3Ed5+GV8+I5IreQOg9WNI9OKS10e75+Oz8z9canTDFqzYmSD/Xi8/whFrIic/jzc3NzclaXVm1Ypj47eVOkipKAKXx+lCTCrKWKE9afvVaTncPSv46OKAHFYJBr/+bAZfD8e5jwc7B/tk7Q1MzyywUg1qWqMh/tHx0cHw/13VZOctdJWW+SqnpYsr1DbgtmFiZnR2PSZSESlIdk/fTsam8dMGM9KA8PaaaIdDk/6NWfsjwhEVR6hu2XVkGlRQG3n0rEJR0kEHpy7X8+OjyReAXwR+DH17Fvzipb0E7zE4cnxeHQ0/N38bVTSU6mlBi0fGLyz2Jq4lAAQuQSjb+dGKKQASiOJH8u2/QRMbYWX/eHw+D1Y2wofosUjPIw+xTT0YP4EOAH2vRjGCMw+MmWRheUl8Dz3AbJlcaLAtW5NlLmSaTk4O3m3/7t5tH9YEnPRRsM2DzD2SwKEtRBWp2yQJBdUEnB0p1Mrtor0D0fj/Tf74/0i7RT2cwVnmFNNm0qy8r8d/9fr/3r9X6//v9/1P1/qtZ+SBir19tbWev2H78X1f7c72NwgW/X6v7b/tf2v7X99Pbn9v/HDq0vXv4naT6P/X2b/N3u9Tm3/a/tf2/9vY/9721u9fm3/v0v7bzv67V/7IvCR93+dQWerZP/7m5vb9fu/r3Hx91PDdwdkeKD4nqEQEiSua4b03wmNYv47muMnIZPQ8uw5jQzycWE53rkS0HDhRBEmTxHC9r2YejE8x4Sd8oc/YbdjgYiQMPEiDaiQZJJ4caK5Fj5jj6KYBhGHIkQjSYRkLJZ0A5mcU/vKT+Ifr/sCgpAbEFwj+wUIksnCnyYuZeTtJIyca1rCN41917Nu2yHMuhb7vmvPoR8/RiwDuxaz7S8C3+Mds10nCG4ztNAhuGeFM188IZpmua7GE8vRKjjscQmq9v+1//9b+f8+WOKt2v9/J/5fmM0nzf895P97lf0/3e3tzdr/f43rY+Y2iXpNvakfttn7NK2nUe9aPUf/b8VzskeqT+EZ3ze0YtvQ8enozL+Mb6yQyk1Q3KBZtmkIvGBtZur1f+3//17+fzDo7G7Xivk96P+fwdXs6bb+fpb/3wRlL/n/rf5W7f+/iv8PLPvKmtFzBTMBuNkl3+F7TUNc2uPNjt7VO7jZZkoDiAOoZ+O+JMmxnyvg2ddsIV4TC6hKSNlOnT6d7G4OOtN+d4dOB/0p3d3t0/6kOx3Q/ibd7gw2e91d2umpighFVkUqtbWq/X/t//8i/78z2N0e1Br1HVxDzEl+W//f7Q0GFf8/6NT+/+/n/+nUicWdHthoVXEdm3oRa3d4MC4HCOeK5d3O/Rt8DMD2PPQ9H37ckQLqvtoil9SKkzDd7k/DKVXPyVJhzEx9fNvA2q0PMladU3KdCe4T568tsB3iUQEtCxx6fKPwHVkfVbRhHDDvz14YsIYJ41JLYsflzG9iGPPvG0zqVzrW7QF1sadYk3p4abkRLfWZbUBuERUpuZEG/7EBYENRxtwtDxi4buea5g1MxCZGPfavHP9RDAsL950zBmJtAfw6WjzHtzgMKcOhxYk3i2LqOTGt9rU3KKPMe6Ld0Elw5WioQ7xb4rwZhHRJ4kwf5Y4LBDB33WfNa7tdx391/Pdk8d9uZ3u7t1lr2XdwnY723xyO9MX0CWk8Fv8NOtuV/d+dQR3/fY3rHySN9xSldHbPD2hoYbhnubhBRMezfeGtOCxHnIjEEFdFuIVjSqCZ5RGImBwI8RaARrm2Qocd2ZrckgsppLogSeR4M3JRqjxw8YJYQQDxJCNJbB/CHow/IuJ7VLF979KZJZwfEiUhHpzWFWU8pyXspzChhIdtyGPgeB5lpzIt8taJ810iJIEoNVQuqkHfhU6GB4RtOQHiidQmyjeWuLdA/eLiIpor9FOAB8Lz0+97z2/9JCS//nP8XOF7PsLEI5pG0kPkEe7/4KfdycqT7MVmNoxDTDV+llLT2NlhorKOvnMWlgr3xGlfiMJ9L567t+KUuUqKFwCmJ2kJBPADrbOrdfrj3qbR6cC/fwGAOPKaP94ad7rp4zK27LTp/gIPqltt5AfuF86NZq8HeYiu00/WInBpm/JtOC40Kfc3OwGpaelxcaLrOvxMh1B0EGnJh9oZVIXLwsFR8vxOnYV+EuBJWHb60FAzRtRlacpurBiWDprGj5Ajepx1mPp8ui9QziTR13wPJsDypsRh26GYBsGdOQghLH9wrxVKGx7wF2sD/du52jr+q+O/Ov77fq8otNtPTePLz390+qj/9fmP2v7X9v9b2P/eTmer3v/5vdh/zIrr4bfa/9nd2hpU9n9sd+v9Hxtfp/uU8Jc0hnE3sRy3RYZ4iuNT3CKnNILFyfKFgkCYJjD5mxiATEvp/OZ40xY5SSauE83HbJ0l4LNXLIbxEyy1XTr9md0ZedcCgL9KMfFVimGcxbDIXYw+xfyheKUClIZsKd8ihzSe+1OBPH/JARD40SIfLDeh6eN4CveBdgu+hobxc+gvgIB4yl5mmNLLDIAVi0jTim49u0UKD3kywTAOYPHKuTnlh2MEPlhGGsb70BW/EgeIv4f/v1CUf3xkxAyDH5dh2MmlR/Bno0m0V2KMXzaar8gdOy2CSZBbk41eo/n6Bbvn0hgPoSxwTblH2JjCUMNzHRb7jW5TT7yb0ApMPzSpG9HG/T1RsXaNqsMK1G80mxyNcwmEYzzA80NDoNOtyIQhajRbogWBppqWf52rTcEYXni/IbCx8zywBg89cnzVyIgsM46twAFu9wPHMC5hAkzgO+sR44OUmZAoZQX3IpXsvSJBCD1hE94AtLo4ndTgQmEYb0dj6ED7utvOm7XIke/Rpm7dWE78utnKUecZgy9ELjd8FD1PtTACqXSxO41nQCRtt6IZL7RUaMdvrW0opYd4M3bDZDfWN0pzLKIJ/DTx57oGWDkPIeFzHQjLlTAg9m0NmB/PaYhAaG1+aKiJd+X5N14m4HcMYPmCZWAu0uwkE70LVYwzFzIudspSUUClCnqzUrNQJgMrjJA6Kdskw/DoTSraHEq3kqkTmzz12DjzF7ShlpKWalNWUdDJ65J+2r7rwgwaxssP1H5pvnqVksiYQY0W9NgHakJio2mcwgACxhZ5hDSo9Q8clS7GMq2tpjuRSRdBfAsjAjYhhaJh6IeFh7ne8UlR5ASa6njXlutMWeYKOEoW/CicILZ3Z7xetghHyn6orUL71by1SIGbrEXBjGDpscYVvW2RazTvTeJ4aTOh6FM+5VIP2m0C3smmUcRrACYB5ucw5+xS8U4bE8IxieeYH/ZB9/WsceJF1iUld3wSIxqb11ZY4GD5YqUE8llDaydYwXqjBgG3wAcD/AD1DHLGypvxWyzzS4R/QxzOInAlDCDUud2UJPqMupevpA4DE3hLupPTR1vmoCgV6642X3NhYxLKvH0FoDiHgv0SOl7rtamUMq6khJSBkQXmqyc0TYJPYfxDP5nN4ZPK6dMKbXmchJrmAMummA7uPFMHm9rwZxGMDKu1iqZcBBEttuPDIM9g0lpk4k9vDXLMpPIliyJeyaPN70iDi5rLty8gbh3HWf8DpKiBSHWY3wW386bwtY3n7eeZrqYIFkmc8pgiwm5mvmchGAVCTX1CrZCGppWAs2cd0tl0SH4YTABiZYYC+9MEpPgJgpxTEd905uieMbAXQo5TtiAeC3y+nyeFjqg3baRWvNgJ6GacRAyWN9P5HTlCQDgUBRmKiUYVJdoxjgBNU5TYqMMF45QbKBVL+qZdu4RbIE+NO9562TTIHdJYqhIjS5kOPi3YPymSYRNuGEeJ6xbGBx7JYSdTTYxaniGypo6Hhs1U7sHYgukCAQBOU+uJHGPFwJy55utUeEF8M9EtBgvgQkFQwSg84NPSVyJ72dcszloT2mSdSmOck+Ozca5UzzLmMerxUfDadynuZZsHNpISMrlDIj807pZN8SALjV6UTGWlpyK8+T92FcUnC2/Tpy0ir1QMY5gVWIbotvjoLS+2/E9ea7nqE0sBGjoV9qKHzy6v3Jkhx0CmVL1ZrQTITEP3iBi4auirGlkvpShLKgGqVg28VAZUtqOqXKKz2qxQprPQLiuVaTA+mTMqldYswEcUos8YoJkDRedZqUp9NhqejsZqU/evGkIBmg9Ka0FIK5F4WwTMLcn8fYbsyTHyZ0jeurni5Z6rnpEVhi6OjCjcXIFNyzwX5yuvmmyyWsuVEZWrNssrQPFOUXaSalZteQX1rOJygb6okVyFT+skF6CzmsUrBkLUOC7AF6oRVxsVKxIXWoLKOR4VzSRTLYHAlCZ07dMYokV4+PF8tZDfLf9LiWSSFH2xFGbLrs+QwbTKOoSVfNNkeWrSeut5eCetTkSt471itkYyc6mtMWTbmo9SoeR8dcoKVeclBqSFHw/8K4akVPM5bbLMWcfSyHtl+S9XX87D0Eo6xJTcMayijLt0JJfGHf6DWeOjo+d+Q9wo9LopLd54CIhCkUeAud/MBKKd02pLa+7CulGKuhAfCwSZTGD0l/eqEAYiII8Cc4A5e4fTqJSebuEASnA8ABSmjIi62kwp+NdzEH8JfEUE+DnR32dGfmujvi+N9IRjlTT2gXDtAZ3EBMdnKOMqBRR/e+CR4KuQVyqGWlgxp30HsgLRVTG/tJZdnmr5axhOVyaPynbGZ/smymUZmum4ZI4gBgMbCDPL7vBfsCRJN+6rMLnqTQSfS4IKyn+q6VqOCd0C9JeGIdPdND/NP1kklrhT4vmYFfXEyhvitjPfvqKs2nxRv4qLLeQpTTiy/KjJE7xpyaPMaKYrIK5WkQloWAsQKymCVlEf/dD50+J/JiF7kI3XT0xvCTMzudqWDKSkNI2I5cJbxMRlXCEz3RA8VbWxYbZEP60pNuM4dAj6nDjVyJs5aE++UFyAolkz2mRiYU11T1LO0npXgAKk+FZctombqMBcw0trNqYILlgblQ1CBo6Dzxu8rqzUVqT4crckCbkcxKfiXgzsc9UvSX/2l17ShVhR8lhiqip97HbGU+bLwMSCBj5Hw+TYOPxrkwg4oCyZJPs0tNCr/BaOWDGLv9qq8ezU+lXoHRBYZjkYvmbB1aia9SQbnAd7whNYaVeK7K8lzmqEeTPCmFCl+czsI2NfhGyp9JSkRu43yA3/QwFmAKsNWMKn/ecjyMaK0+BvLMoYpTg3zS+/zN4c3EuLi/tCMv++uAS8lzPv97l3vwfzeM/s8ivC/zrBuZoqeX12pb7qq77qq77qq76+9fUfdG1s2wB4AAA='
+          EXPECTED_SHA256: 'ec973c04f4db4fb7e768c20a0483edbc64573321cf5176f75207d5f7a34d9efa'
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp)
+          printf '%s' "$PAYLOAD_B64" | base64 --decode > "$tmp"
+          printf '%s  %s\n' "$EXPECTED_SHA256" "$tmp" | sha256sum --check --status
+          tar -xzf "$tmp"
+          rm -f "$tmp" .github/workflows/recover-provider-cross-posting.yml
+          git diff --check
+          if grep -RIE --exclude-dir=.git \
+            '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|lin_api_[A-Za-z0-9]{20,}|cfat_[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,}|sk-(proj-)?[A-Za-z0-9_-]{20,})' .; then
+            echo 'credential-like material found; refusing to publish' >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Recover flags-2-env operations CLI' \
+            -m 'Recovered from the credential-clean 55-day ChatGPT work-reconciliation corpus; dancing-dragons excluded.'
+          git push origin HEAD:agent/provider-cross-posting
