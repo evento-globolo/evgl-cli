@@ -1,170 +1,198 @@
-use anyhow::{Context, bail};
+use anyhow::{bail, Context, Result};
+use evgl_domain::{ProviderKind, PublishTarget};
 use flags2env::BundledFlags2Env;
 use futures_util::StreamExt;
-use tokio_tungstenite::connect_async;
+use reqwest::{Client, Method};
+use serde_json::{json, Value};
+use std::{env, str::FromStr};
+use tokio_tungstenite::{connect_async, tungstenite::client::IntoClientRequest};
+use url::Url;
+use uuid::Uuid;
 
-const HELP: &str = "evgl-cli 0.1.0\n\nUsage: evgl-cli [options] <command>\n\nCommands:\n  health  Check the Evento Globolo API\n  list    List events\n  get     Read one event; requires --id\n  watch   Stream event updates\n\nOptions:\n  -h, --help       Print this help\n  -V, --version    Print the CLI version\n\nConfiguration flags are defined in .cli-flags.toml.\n";
-const VERSION: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n");
-
-fn informational_output<I, S>(arguments: I) -> Option<&'static str>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    arguments
-        .into_iter()
-        .find_map(|argument| match argument.as_ref() {
-            "-h" | "--help" => Some(HELP),
-            "-V" | "--version" => Some(VERSION),
-            _ => None,
-        })
+#[tokio::main]
+async fn main() -> Result<()> {
+    apply_flags()?;
+    let command = env::args().nth(1).unwrap_or_else(|| "help".into());
+    if matches!(command.as_str(), "help" | "--help" | "-h") {
+        help();
+        return Ok(());
+    }
+    let api = Api::from_env()?;
+    match command.as_str() {
+        "providers" => print_json(api.request(Method::GET, "/v1/providers", None).await?),
+        "connections" => print_json(api.request(Method::GET, "/v1/connections", None).await?),
+        "connect-start" => connect_start(&api).await?,
+        "connect-manual" => connect_manual(&api).await?,
+        "create-event" => create_event(&api).await?,
+        "cross-post" => cross_post(&api).await?,
+        "job" => job(&api).await?,
+        "watch" => watch(&api).await?,
+        other => bail!("unknown command {other}; run `evgl-cli help`"),
+    }
+    Ok(())
 }
 
-fn apply_flags() -> anyhow::Result<String> {
+fn apply_flags() -> Result<()> {
     let parser = BundledFlags2Env::new();
-    parser
-        .audit_config(Some(".cli-flags.toml"))
-        .map_err(|error| anyhow::anyhow!("invalid .cli-flags.toml: {error}"))?;
-    let argv = std::env::args().collect::<Vec<_>>();
-    let parsed = parser
-        .parse_structured(&argv, Some(".cli-flags.toml"))
-        .map_err(|error| anyhow::anyhow!("could not parse CLI arguments: {error}"))?;
+    parser.audit_config(Some(".cli-flags.toml"))?;
+    let argv = env::args().collect::<Vec<_>>();
+    let parsed = parser.parse_structured(&argv, Some(".cli-flags.toml"))?;
     if !parsed.unknown_options.is_empty() || !parsed.errors.is_empty() {
         bail!(
             "invalid CLI arguments: unknown={:?}, errors={:?}",
-            parsed.unknown_options,
-            parsed.errors
+            parsed.unknown_options, parsed.errors
         );
     }
-    let command = parsed.command.clone();
     for (key, value) in parsed.provided_flags {
-        // SAFETY: command-line parsing completes before the Tokio runtime starts
-        // or any application thread is spawned.
-        unsafe { std::env::set_var(key, value) };
+        unsafe { env::set_var(key, value) };
     }
-    Ok(command)
+    Ok(())
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    if let Some(output) = informational_output(std::env::args().skip(1)) {
-        print!("{output}");
-        return Ok(());
+struct Api {
+    base: Url,
+    token: String,
+    http: Client,
+}
+
+impl Api {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            base: required("EVGL_API_URL")?.parse().context("EVGL_API_URL")?,
+            token: required("EVGL_TOKEN")
+                .context("EVGL_TOKEN must be provided through the environment")?,
+            http: Client::new(),
+        })
     }
 
-    let command = apply_flags()?;
-    let base = std::env::var("EVGL_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
-    let timeout = std::env::var("EVGL_TIMEOUT_SECONDS")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(20);
-    let output = std::env::var("EVGL_OUTPUT").unwrap_or_else(|_| "json".into());
-    validate_output(&output)?;
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(timeout))
-        .build()?;
-    let base = base.trim_end_matches('/');
-
-    match command.as_str() {
-        "health" => {
-            print_response(client.get(format!("{base}/healthz")).send().await?, &output).await
+    async fn request(&self, method: Method, path: &str, body: Option<Value>) -> Result<Value> {
+        let url = self.base.join(path.trim_start_matches('/'))?;
+        let mut request = self.http.request(method, url).bearer_auth(&self.token);
+        if let Some(body) = body { request = request.json(&body); }
+        let response = request.send().await?;
+        let status = response.status();
+        let text = response.text().await?;
+        if !status.is_success() {
+            bail!("API request failed ({status}): {text}");
         }
-        "list" => {
-            print_response(
-                client.get(format!("{base}/v1/events")).send().await?,
-                &output,
-            )
-            .await
-        }
-        "get" => {
-            let id = std::env::var("EVGL_ID").context("--id is required")?;
-            print_response(
-                client.get(format!("{base}/v1/events/{id}")).send().await?,
-                &output,
-            )
-            .await
-        }
-        "watch" => watch(base).await,
-        _ => bail!("choose one command: health, list, get, watch"),
+        if text.is_empty() { return Ok(Value::Null); }
+        Ok(serde_json::from_str(&text).with_context(|| format!("invalid API JSON: {text}"))?)
     }
 }
 
-fn validate_output(output: &str) -> anyhow::Result<()> {
-    match output {
-        "json" | "text" => Ok(()),
-        _ => bail!("EVGL_OUTPUT must be json or text"),
-    }
+async fn connect_start(api: &Api) -> Result<()> {
+    let provider = provider()?;
+    print_json(api.request(
+        Method::POST,
+        &format!("/v1/oauth/{provider}/start"),
+        Some(json!({})),
+    ).await?);
+    Ok(())
 }
 
-async fn print_response(response: reqwest::Response, output: &str) -> anyhow::Result<()> {
+async fn connect_manual(api: &Api) -> Result<()> {
+    let provider = provider()?;
+    if !matches!(provider, ProviderKind::Craigslist | ProviderKind::GenericWebhook) {
+        bail!("connect-manual is only valid for craigslist and generic_webhook");
+    }
+    let body = json!({
+        "provider": provider,
+        "account_key": required("EVGL_ACCOUNT_KEY")?,
+        "display_name": required("EVGL_DISPLAY_NAME")?,
+        "metadata": json_env("EVGL_METADATA")?,
+        "secret": env::var("EVGL_CONNECTION_SECRET").ok()
+    });
+    print_json(api.request(Method::POST, "/v1/connections/manual", Some(body)).await?);
+    Ok(())
+}
+
+async fn create_event(api: &Api) -> Result<()> {
+    let body = json!({
+        "title": required("EVGL_TITLE")?,
+        "summary": required("EVGL_SUMMARY")?,
+        "description_html": env::var("EVGL_DESCRIPTION").unwrap_or_default(),
+        "starts_at": required("EVGL_STARTS_AT")?,
+        "ends_at": required("EVGL_ENDS_AT")?,
+        "timezone": required("EVGL_TIMEZONE")?,
+        "canonical_url": required("EVGL_CANONICAL_URL")?,
+        "online_url": Value::Null,
+        "venue": Value::Null,
+        "tags": [],
+        "metadata": {}
+    });
+    print_json(api.request(Method::POST, "/v1/events", Some(body)).await?);
+    Ok(())
+}
+
+async fn cross_post(api: &Api) -> Result<()> {
+    let event_id: Uuid = required("EVGL_EVENT_ID")?.parse()?;
+    let target = PublishTarget {
+        provider: provider()?,
+        connection_id: required("EVGL_CONNECTION_ID")?.parse()?,
+        options: json_env("EVGL_TARGET_OPTIONS")?,
+    };
+    let key = env::var("EVGL_IDEMPOTENCY_KEY")
+        .unwrap_or_else(|_| format!("cli:{event_id}:{}:{}", target.provider, target.connection_id));
+    let url = api.base.join(&format!("v1/events/{event_id}/cross-post"))?;
+    let response = api.http.post(url)
+        .bearer_auth(&api.token)
+        .header("idempotency-key", key)
+        .json(&json!({ "targets": [target] }))
+        .send().await?;
     let status = response.status();
     let text = response.text().await?;
-    if !status.is_success() {
-        bail!("HTTP {status}: {text}");
-    }
-    if output == "json" {
-        let value: serde_json::Value = serde_json::from_str(&text)?;
-        println!("{}", serde_json::to_string_pretty(&value)?);
-    } else {
-        println!("{text}");
+    if !status.is_success() { bail!("API request failed ({status}): {text}"); }
+    print_json(serde_json::from_str(&text)?);
+    Ok(())
+}
+
+async fn job(api: &Api) -> Result<()> {
+    let id = required("EVGL_JOB_ID")?;
+    print_json(api.request(Method::GET, &format!("/v1/jobs/{id}"), None).await?);
+    Ok(())
+}
+
+async fn watch(api: &Api) -> Result<()> {
+    let id = required("EVGL_JOB_ID")?;
+    let mut url = api.base.join(&format!("v1/jobs/{id}/ws"))?;
+    url.set_scheme(if url.scheme() == "https" { "wss" } else { "ws" })
+        .map_err(|_| anyhow::anyhow!("could not construct WebSocket URL"))?;
+    let mut request = url.as_str().into_client_request()?;
+    request.headers_mut().insert(
+        "authorization",
+        format!("Bearer {}", api.token).parse()?,
+    );
+    let (stream, _) = connect_async(request).await?;
+    let (_, mut read) = stream.split();
+    while let Some(message) = read.next().await {
+        let message = message?;
+        if message.is_text() {
+            println!("{}", message.into_text()?);
+        }
     }
     Ok(())
 }
 
-fn websocket_url(base: &str) -> anyhow::Result<String> {
-    let base = base.trim_end_matches('/');
-    if let Some(rest) = base.strip_prefix("http://") {
-        return Ok(format!("ws://{rest}/v1/ws"));
-    }
-    if let Some(rest) = base.strip_prefix("https://") {
-        return Ok(format!("wss://{rest}/v1/ws"));
-    }
-    bail!("EVGL_BASE_URL must start with http:// or https://")
+fn provider() -> Result<ProviderKind> {
+    ProviderKind::from_str(&required("EVGL_PROVIDER")?)
+        .map_err(|error| anyhow::anyhow!(error))
 }
 
-async fn watch(base: &str) -> anyhow::Result<()> {
-    let (socket, _) = connect_async(websocket_url(base)?).await?;
-    let (_, mut incoming) = socket.split();
-    while let Some(message) = incoming.next().await {
-        println!("{}", message?.into_text()?);
-    }
-    Ok(())
+fn json_env(key: &'static str) -> Result<Value> {
+    let value = env::var(key).unwrap_or_else(|_| "{}".into());
+    serde_json::from_str(&value).with_context(|| format!("{key} must be valid JSON"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn required(key: &'static str) -> Result<String> {
+    env::var(key).with_context(|| format!("missing {key}"))
+}
 
-    #[test]
-    fn help_and_version_are_available_without_configuration_or_network() {
-        assert_eq!(informational_output(["--help"]), Some(HELP));
-        assert_eq!(informational_output(["-h"]), Some(HELP));
-        assert_eq!(informational_output(["--version"]), Some(VERSION));
-        assert_eq!(informational_output(["health"]), None);
-    }
+fn print_json(value: Value) {
+    println!("{}", serde_json::to_string_pretty(&value).unwrap());
+}
 
-    #[test]
-    fn websocket_url_maps_http_schemes_and_normalizes_trailing_slashes() {
-        assert_eq!(
-            websocket_url("http://127.0.0.1:8080/").unwrap(),
-            "ws://127.0.0.1:8080/v1/ws"
-        );
-        assert_eq!(
-            websocket_url("https://events.example.com").unwrap(),
-            "wss://events.example.com/v1/ws"
-        );
-    }
-
-    #[test]
-    fn websocket_url_rejects_unexpected_schemes() {
-        let error = websocket_url("file:///tmp/socket").unwrap_err().to_string();
-        assert!(error.contains("http:// or https://"));
-    }
-
-    #[test]
-    fn output_mode_is_explicit() {
-        assert!(validate_output("json").is_ok());
-        assert!(validate_output("text").is_ok());
-        assert!(validate_output("yaml").is_err());
-    }
+fn help() {
+    println!(
+        "evgl-cli <providers|connections|connect-start|connect-manual|create-event|cross-post|job|watch> [flags]"
+    );
 }
