@@ -1,7 +1,10 @@
 use anyhow::{Context, bail};
 use flags2env::BundledFlags2Env;
 use futures_util::StreamExt;
+use std::collections::BTreeMap;
 use tokio_tungstenite::connect_async;
+
+type EnvMap = BTreeMap<String, String>;
 
 const HELP: &str = "evgl-cli 0.1.0\n\nUsage: evgl-cli [options] <command>\n\nCommands:\n  health  Check the Evento Globolo API\n  list    List events\n  get     Read one event; requires --id\n  watch   Stream event updates\n\nOptions:\n  -h, --help       Print this help\n  -V, --version    Print the CLI version\n\nConfiguration flags are defined in .cli-flags.toml.\n";
 const VERSION: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n");
@@ -20,14 +23,18 @@ where
         })
 }
 
-fn apply_flags() -> anyhow::Result<String> {
+fn merge_env(mut initial: EnvMap, overrides: impl IntoIterator<Item = (String, String)>) -> EnvMap {
+    initial.extend(overrides);
+    initial
+}
+
+fn apply_flags(argv: &[String], initial: EnvMap) -> anyhow::Result<(String, EnvMap)> {
     let parser = BundledFlags2Env::new();
     parser
         .audit_config(Some(".cli-flags.toml"))
         .map_err(|error| anyhow::anyhow!("invalid .cli-flags.toml: {error}"))?;
-    let argv = std::env::args().collect::<Vec<_>>();
     let parsed = parser
-        .parse_structured(&argv, Some(".cli-flags.toml"))
+        .parse_structured(argv, Some(".cli-flags.toml"))
         .map_err(|error| anyhow::anyhow!("could not parse CLI arguments: {error}"))?;
     if !parsed.unknown_options.is_empty() || !parsed.errors.is_empty() {
         bail!(
@@ -37,28 +44,29 @@ fn apply_flags() -> anyhow::Result<String> {
         );
     }
     let command = parsed.command.clone();
-    for (key, value) in parsed.provided_flags {
-        // SAFETY: command-line parsing completes before the Tokio runtime starts
-        // or any application thread is spawned.
-        unsafe { std::env::set_var(key, value) };
-    }
-    Ok(command)
+    Ok((command, merge_env(initial, parsed.provided_flags)))
+}
+
+fn env_or(env: &EnvMap, key: &str, default: &str) -> String {
+    env.get(key).cloned().unwrap_or_else(|| default.to_string())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    if let Some(output) = informational_output(std::env::args().skip(1)) {
+    let argv = std::env::args().collect::<Vec<_>>();
+    if let Some(output) = informational_output(argv.iter().skip(1)) {
         print!("{output}");
         return Ok(());
     }
 
-    let command = apply_flags()?;
-    let base = std::env::var("EVGL_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
-    let timeout = std::env::var("EVGL_TIMEOUT_SECONDS")
-        .ok()
+    let initial = std::env::vars().collect::<EnvMap>();
+    let (command, env) = apply_flags(&argv, initial)?;
+    let base = env_or(&env, "EVGL_BASE_URL", "http://127.0.0.1:8080");
+    let timeout = env
+        .get("EVGL_TIMEOUT_SECONDS")
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(20);
-    let output = std::env::var("EVGL_OUTPUT").unwrap_or_else(|_| "json".into());
+    let output = env_or(&env, "EVGL_OUTPUT", "json");
     validate_output(&output)?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(timeout))
@@ -77,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
             .await
         }
         "get" => {
-            let id = std::env::var("EVGL_ID").context("--id is required")?;
+            let id = env.get("EVGL_ID").context("--id is required")?;
             print_response(
                 client.get(format!("{base}/v1/events/{id}")).send().await?,
                 &output,
@@ -166,5 +174,16 @@ mod tests {
         assert!(validate_output("json").is_ok());
         assert!(validate_output("text").is_ok());
         assert!(validate_output("yaml").is_err());
+    }
+
+    #[test]
+    fn cli_overrides_win_without_mutating_process_environment() {
+        let before = std::env::var_os("EVGL_OUTPUT");
+        let env = merge_env(
+            EnvMap::from([("EVGL_OUTPUT".into(), "text".into())]),
+            [("EVGL_OUTPUT".into(), "json".into())],
+        );
+        assert_eq!(env.get("EVGL_OUTPUT").map(String::as_str), Some("json"));
+        assert_eq!(std::env::var_os("EVGL_OUTPUT"), before);
     }
 }
