@@ -1,25 +1,8 @@
 [package]
-org = "evento-globolo"
 name = "evgl-cli"
 version = "0.1.0"
-description = "Command-line interface for Evento Globolo"
-license = "MIT"
-language = "rust"
 
-[package.repository]
-vcs = "git"
-url = "https://github.com/evento-globolo/evgl-cli"
-
-[publish]
-include_readme = true
-tag_format = "v{version}"
-exclude = [".env", ".env.*", "node_modules/**", ".vendor/.zed/**", "target/**", "dist/**", "*.log"]
-
-[dependencies]
-"evento-globolo/evgl-clients" = "^0.1.0"
-"evento-globolo/evgl-interfaces" = "^0.1.0"
-"evento-globolo/evgl-libs" = "^0.1.0"
-
-[install]
-dir = ".vendor/.zed"
-adapter = "rust"
+[dependencies.flags-2-env]
+git = "https://github.com/ORESoftware/flags-2-env"
+rev = "4eb9360d418ed64de994e4b1d6e43e7063219e02"
+path = "vendor/flags-2-env"

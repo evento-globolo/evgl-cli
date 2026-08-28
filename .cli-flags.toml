@@ -10,12 +10,19 @@ unknown_options_env = "EVGL_UNKNOWN_OPTIONS"
 [env]
 ignore = ["EVGL_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"]
 
+[flags.api_url]
+env = "EVGL_API_URL"
+aliases = ["api-url", "url"]
+type = "string"
+default = "http://localhost:8080"
+help = "Evento Globolo API base URL."
+
 [flags.base_url]
 env = "EVGL_BASE_URL"
 aliases = ["base-url"]
 type = "string"
 default = "http://127.0.0.1:8080"
-help = "Base URL for the Evento Globolo API."
+help = "Base URL for the Evento Globolo API (alias of --api-url)."
 
 [flags.timeout_seconds]
 env = "EVGL_TIMEOUT_SECONDS"
@@ -31,6 +38,112 @@ type = "string"
 default = "json"
 help = "Output mode: json or text."
 
+[flags.provider]
+env = "EVGL_PROVIDER"
+aliases = ["provider"]
+short = "p"
+type = "string"
+help = "Provider name: eventbrite, meetup, meta_facebook_page, craigslist, or generic_webhook."
+
+[flags.connection_id]
+env = "EVGL_CONNECTION_ID"
+aliases = ["connection-id", "connection"]
+type = "string"
+help = "Provider connection UUID."
+
+[flags.event_id]
+env = "EVGL_EVENT_ID"
+aliases = ["event-id", "event"]
+type = "string"
+help = "Canonical event UUID."
+
+[flags.id]
+env = "EVGL_ID"
+aliases = ["id"]
+type = "string"
+help = "Event UUID for get."
+
+[flags.job_id]
+env = "EVGL_JOB_ID"
+aliases = ["job-id", "job"]
+type = "string"
+help = "Cross-post job UUID."
+
+[flags.title]
+env = "EVGL_TITLE"
+aliases = ["title"]
+type = "string"
+help = "Event title."
+
+[flags.summary]
+env = "EVGL_SUMMARY"
+aliases = ["summary"]
+type = "string"
+help = "Event summary."
+
+[flags.description]
+env = "EVGL_DESCRIPTION"
+aliases = ["description", "description-html"]
+type = "string"
+help = "Event HTML description."
+
+[flags.starts_at]
+env = "EVGL_STARTS_AT"
+aliases = ["starts-at", "start"]
+type = "string"
+help = "Event start as RFC3339."
+
+[flags.ends_at]
+env = "EVGL_ENDS_AT"
+aliases = ["ends-at", "end"]
+type = "string"
+help = "Event end as RFC3339."
+
+[flags.timezone]
+env = "EVGL_TIMEZONE"
+aliases = ["timezone", "tz"]
+type = "string"
+default = "UTC"
+help = "IANA timezone name."
+
+[flags.canonical_url]
+env = "EVGL_CANONICAL_URL"
+aliases = ["canonical-url"]
+type = "string"
+help = "Canonical Evento Globolo event URL."
+
+[flags.target_options]
+env = "EVGL_TARGET_OPTIONS"
+aliases = ["target-options", "options"]
+type = "json"
+default = "{}"
+help = "Provider-specific target options as JSON."
+
+[flags.idempotency_key]
+env = "EVGL_IDEMPOTENCY_KEY"
+aliases = ["idempotency-key"]
+type = "string"
+help = "Stable key for cross-post retries."
+
+[flags.account_key]
+env = "EVGL_ACCOUNT_KEY"
+aliases = ["account-key"]
+type = "string"
+help = "External account identifier for a manual connection."
+
+[flags.display_name]
+env = "EVGL_DISPLAY_NAME"
+aliases = ["display-name"]
+type = "string"
+help = "Human-readable connection name."
+
+[flags.metadata]
+env = "EVGL_METADATA"
+aliases = ["metadata"]
+type = "json"
+default = "{}"
+help = "Connection metadata as JSON."
+
 [commands.health]
 help = "Check API health."
 
@@ -39,11 +152,27 @@ help = "List events."
 
 [commands.get]
 help = "Get one event."
-[commands.get.flags.id]
-env = "EVGL_ID"
-aliases = ["id"]
-type = "string"
-help = "Event UUID."
 
 [commands.watch]
-help = "Watch the API WebSocket event stream."
+help = "Watch a cross-post job WebSocket, or the API event stream when no --job-id is set."
+
+[commands.providers]
+help = "List supported providers."
+
+[commands.connections]
+help = "List provider connections."
+
+[commands.connect-start]
+help = "Start an OAuth connection."
+
+[commands.connect-manual]
+help = "Create a manual Craigslist or webhook connection."
+
+[commands.create-event]
+help = "Create a canonical event."
+
+[commands.cross-post]
+help = "Cross-post an event to a provider target."
+
+[commands.job]
+help = "Read a cross-post job."
