@@ -403,6 +403,15 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn empty_and_whitespace_env_values_are_absent() {
+        for raw in ["", " ", "\t"] {
+            let env = EnvMap::from([("EVGL_OUTPUT".into(), raw.into())]);
+            assert_eq!(env_value(&env, "EVGL_OUTPUT"), None, "raw={raw:?}");
+            assert_eq!(env_or(&env, "EVGL_OUTPUT", "json"), "json");
+        }
+    }
+
     fn apply_cli_flags_merges_cli_over_base_env_without_mutation() {
         let before = std::env::var_os("EVGL_OUTPUT");
         let initial = EnvMap::from([("EVGL_OUTPUT".into(), "text".into())]);
