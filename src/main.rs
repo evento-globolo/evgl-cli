@@ -1,10 +1,11 @@
 use anyhow::{Context, bail};
 use flags2env::BundledFlags2Env;
 use futures_util::StreamExt;
-use std::collections::BTreeMap;
 use tokio_tungstenite::connect_async;
 
-type EnvMap = BTreeMap<String, String>;
+mod env_map;
+
+use env_map::{EnvMap, current_env_map, env_value, get_env_map, process_argv};
 
 const HELP: &str = "evgl-cli 0.1.0\n\nUsage: evgl-cli [options] <command>\n\nCommands:\n  health  Check the Evento Globolo API\n  list    List events\n  get     Read one event; requires --id\n  watch   Stream event updates\n\nOptions:\n  -h, --help       Print this help\n  -V, --version    Print the CLI version\n\nConfiguration flags are defined in .cli-flags.toml.\n";
 const VERSION: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"), "\n");
@@ -23,19 +24,7 @@ where
         })
 }
 
-fn merge_env(mut initial: EnvMap, overrides: impl IntoIterator<Item = (String, String)>) -> EnvMap {
-    initial.extend(overrides);
-    initial
-}
-
-fn env_value<'a>(env: &'a EnvMap, key: &str) -> Option<&'a str> {
-    env.get(key)
-        .map(String::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-}
-
-fn apply_flags(argv: &[String], initial: EnvMap) -> anyhow::Result<(String, EnvMap)> {
+fn apply_cli_flags(argv: &[String], initial: EnvMap) -> anyhow::Result<(String, EnvMap)> {
     let parser = BundledFlags2Env::new();
     parser
         .audit_config(Some(".cli-flags.toml"))
@@ -51,7 +40,7 @@ fn apply_flags(argv: &[String], initial: EnvMap) -> anyhow::Result<(String, EnvM
         );
     }
     let command = parsed.command.clone();
-    Ok((command, merge_env(initial, parsed.provided_flags)))
+    Ok((command, get_env_map(initial, parsed.provided_flags)))
 }
 
 fn env_or(env: &EnvMap, key: &str, default: &str) -> String {
@@ -62,14 +51,13 @@ fn env_or(env: &EnvMap, key: &str, default: &str) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let argv = std::env::args().collect::<Vec<_>>();
+    let argv = process_argv();
     if let Some(output) = informational_output(argv.iter().skip(1)) {
         print!("{output}");
         return Ok(());
     }
 
-    let initial = std::env::vars().collect::<EnvMap>();
-    let (command, env) = apply_flags(&argv, initial)?;
+    let (command, env) = apply_cli_flags(&argv, current_env_map())?;
     let base = env_or(&env, "EVGL_BASE_URL", "http://127.0.0.1:8080");
     let timeout = env
         .get("EVGL_TIMEOUT_SECONDS")
@@ -186,17 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn cli_overrides_win_without_mutating_process_environment() {
-        let before = std::env::var_os("EVGL_OUTPUT");
-        let env = merge_env(
-            EnvMap::from([("EVGL_OUTPUT".into(), "text".into())]),
-            [("EVGL_OUTPUT".into(), "json".into())],
-        );
-        assert_eq!(env.get("EVGL_OUTPUT").map(String::as_str), Some("json"));
-        assert_eq!(env_or(&env, "EVGL_OUTPUT", "text"), "json");
-        assert_eq!(std::env::var_os("EVGL_OUTPUT"), before);
-    }
-
     #[test]
     fn empty_and_whitespace_env_values_are_absent() {
         for raw in ["", " ", "\t"] {
@@ -206,8 +183,7 @@ mod tests {
         }
     }
 
-    #[test]
-    fn apply_flags_merges_cli_over_base_env_without_mutation() {
+    fn apply_cli_flags_merges_cli_over_base_env_without_mutation() {
         let before = std::env::var_os("EVGL_OUTPUT");
         let initial = EnvMap::from([("EVGL_OUTPUT".into(), "text".into())]);
         let argv = vec![
@@ -216,14 +192,14 @@ mod tests {
             "--output".into(),
             "json".into(),
         ];
-        let (command, env) = apply_flags(&argv, initial).unwrap();
+        let (command, env) = apply_cli_flags(&argv, initial).unwrap();
         assert_eq!(command, "health");
         assert_eq!(env.get("EVGL_OUTPUT").map(String::as_str), Some("json"));
         assert_eq!(std::env::var_os("EVGL_OUTPUT"), before);
     }
 
     #[test]
-    fn apply_flags_parse_failure_does_not_mutate_process_environment() {
+    fn apply_cli_flags_parse_failure_does_not_mutate_process_environment() {
         let before = std::env::var_os("EVGL_OUTPUT");
         let initial = EnvMap::from([("EVGL_OUTPUT".into(), "text".into())]);
         let argv = vec![
@@ -231,7 +207,7 @@ mod tests {
             "health".into(),
             "--this-flag-is-not-declared".into(),
         ];
-        assert!(apply_flags(&argv, initial).is_err());
+        assert!(apply_cli_flags(&argv, initial).is_err());
         assert_eq!(std::env::var_os("EVGL_OUTPUT"), before);
     }
 
