@@ -1,4 +1,4 @@
-name: CLI CI
+name: CI
 on:
   pull_request:
   push:
@@ -6,14 +6,17 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
+  contracts:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          persist-credentials: false
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - run: python3 scripts/verify_repo.py
       - run: cargo clippy --all-targets
       - run: cargo test --all-targets

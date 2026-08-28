@@ -1,8 +1,14 @@
 [help]
 url = "https://github.com/evento-globolo/evgl-cli"
+columns = ["options", "env", "type", "default", "description"]
+
+[parse]
+command_env = "EVGL_COMMAND"
+errors_env = "EVGL_PARSE_ERRORS"
+unknown_options_env = "EVGL_UNKNOWN_OPTIONS"
 
 [env]
-ignore = ["EVGL_TOKEN"]
+ignore = ["EVGL_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"]
 
 [flags.api_url]
 env = "EVGL_API_URL"
@@ -10,6 +16,27 @@ aliases = ["api-url", "url"]
 type = "string"
 default = "http://localhost:8080"
 help = "Evento Globolo API base URL."
+
+[flags.base_url]
+env = "EVGL_BASE_URL"
+aliases = ["base-url"]
+type = "string"
+default = "http://127.0.0.1:8080"
+help = "Base URL for the Evento Globolo API (alias of --api-url)."
+
+[flags.timeout_seconds]
+env = "EVGL_TIMEOUT_SECONDS"
+aliases = ["timeout-seconds"]
+type = "integer"
+default = 20
+help = "HTTP timeout in seconds."
+
+[flags.output]
+env = "EVGL_OUTPUT"
+aliases = ["output"]
+type = "string"
+default = "json"
+help = "Output mode: json or text."
 
 [flags.provider]
 env = "EVGL_PROVIDER"
@@ -29,6 +56,12 @@ env = "EVGL_EVENT_ID"
 aliases = ["event-id", "event"]
 type = "string"
 help = "Canonical event UUID."
+
+[flags.id]
+env = "EVGL_ID"
+aliases = ["id"]
+type = "string"
+help = "Event UUID for get."
 
 [flags.job_id]
 env = "EVGL_JOB_ID"
@@ -110,3 +143,36 @@ aliases = ["metadata"]
 type = "json"
 default = "{}"
 help = "Connection metadata as JSON."
+
+[commands.health]
+help = "Check API health."
+
+[commands.list]
+help = "List events."
+
+[commands.get]
+help = "Get one event."
+
+[commands.watch]
+help = "Watch a cross-post job WebSocket, or the API event stream when no --job-id is set."
+
+[commands.providers]
+help = "List supported providers."
+
+[commands.connections]
+help = "List provider connections."
+
+[commands.connect-start]
+help = "Start an OAuth connection."
+
+[commands.connect-manual]
+help = "Create a manual Craigslist or webhook connection."
+
+[commands.create-event]
+help = "Create a canonical event."
+
+[commands.cross-post]
+help = "Cross-post an event to a provider target."
+
+[commands.job]
+help = "Read a cross-post job."
