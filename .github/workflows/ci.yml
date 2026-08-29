@@ -13,5 +13,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - run: python3 scripts/verify_repo.py
+      - run: cargo clippy --all-targets
       - run: cargo test --all-targets

@@ -1,8 +1,23 @@
 # evgl-cli
 
-Rust Evento Globolo CLI integrated through flags-2-env for safe import, publish, and operations workflows.
+Evento Globolo operational CLI. Every option is translated to an environment
+variable by `flags-2-env` using `.cli-flags.toml`; application code reads an
+immutable `EnvMap` snapshot and never mutates the process environment.
 
-Initialized through `DEN-1889` as a testable `cli` foundation. Product behavior continues through focused pull requests.
+```sh
+export EVGL_TOKEN='your JWT'
+cargo run -- providers --api-url http://localhost:8080
+cargo run -- create-event --title "Rust Lima" --summary "Monthly meetup" \
+              --starts-at 2026-09-04T23:00:00Z --ends-at 2026-09-05T01:00:00Z \
+              --timezone America/Lima --canonical-url https://evento.example/e/rust-lima
+cargo run -- cross-post --event-id ... --provider meetup --connection-id ... \
+              --target-options '{"group_urlname":"rust-lima"}'
+cargo run -- watch --job-id ...
+cargo run -- health
+cargo run -- list
+```
+
+`EVGL_TOKEN` is environment-only and intentionally has no CLI flag or default.
 
 ```bash
 python3 scripts/verify_repo.py
