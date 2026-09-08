@@ -39,8 +39,8 @@ _env-dec:
       [[ ! -L "$rel" ]] || { echo "$rel must not be a symlink" >&2; exit 1; }
       [[ ! -e "$rel" || -d "$rel" ]] || { echo "$rel must be a directory" >&2; exit 1; }
     done
-    command -v ores-sops >/dev/null 2>&1 || { echo "ores-sops is required to create env/dec" >&2; exit 1; }
-    ores-sops ensure-dec
+    mkdir -p env/dec
+    chmod 700 env/dec
 
 # List every environment and the variable names it defines (never values).
 [group('env')]
