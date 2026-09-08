@@ -1,9 +1,9 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use evgl_domain::{ProviderKind, PublishTarget};
 use flags2env::BundledFlags2Env;
 use futures_util::StreamExt;
 use reqwest::{Client, Method};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::str::FromStr;
 use tokio_tungstenite::{connect_async, tungstenite::client::IntoClientRequest};
 use url::Url;
@@ -44,21 +44,23 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    arguments.into_iter().find_map(|argument| match argument.as_ref() {
-        "-h" | "--help" => Some(HELP),
-        "-V" | "--version" => Some(VERSION),
-        _ => None,
-    })
+    arguments
+        .into_iter()
+        .find_map(|argument| match argument.as_ref() {
+            "-h" | "--help" => Some(HELP),
+            "-V" | "--version" => Some(VERSION),
+            _ => None,
+        })
 }
 
 fn apply_cli_flags(argv: &[String], initial: EnvMap) -> anyhow::Result<(String, EnvMap)> {
     let parser = BundledFlags2Env::new();
     parser
         .audit_config(Some(".cli-flags.toml"))
-        .context("invalid flags-2-env contract")?;
+        .map_err(|error| anyhow::anyhow!("invalid flags-2-env contract: {error}"))?;
     let parsed = parser
         .parse_structured(argv, Some(".cli-flags.toml"))
-        .context("unable to parse CLI arguments")?;
+        .map_err(|error| anyhow::anyhow!("unable to parse CLI arguments: {error}"))?;
     if !parsed.unknown_options.is_empty() || !parsed.errors.is_empty() {
         bail!(
             "invalid CLI arguments: unknown={:?}, errors={:?}",
@@ -160,7 +162,7 @@ impl Api {
         if text.is_empty() {
             return Ok(Value::Null);
         }
-        Ok(serde_json::from_str(&text).with_context(|| format!("invalid API JSON: {text}"))?)
+        serde_json::from_str(&text).with_context(|| format!("invalid API JSON: {text}"))
     }
 }
 
@@ -174,7 +176,13 @@ async fn foundation(command: &str, env: &EnvMap) -> Result<()> {
     let api = Api::from_env_map(env)?;
     let base = api.base.as_str().trim_end_matches('/');
     match command {
-        "health" => print_response(api.http.get(format!("{base}/healthz")).send().await?, &output).await,
+        "health" => {
+            print_response(
+                api.http.get(format!("{base}/healthz")).send().await?,
+                &output,
+            )
+            .await
+        }
         "list" => {
             print_response(
                 api.http.get(format!("{base}/v1/events")).send().await?,
@@ -187,7 +195,10 @@ async fn foundation(command: &str, env: &EnvMap) -> Result<()> {
                 .or_else(|| env_value(env, "EVGL_EVENT_ID"))
                 .context("--id is required")?;
             print_response(
-                api.http.get(format!("{base}/v1/events/{id}")).send().await?,
+                api.http
+                    .get(format!("{base}/v1/events/{id}"))
+                    .send()
+                    .await?,
                 &output,
             )
             .await
@@ -259,10 +270,17 @@ async fn cross_post(api: &Api, env: &EnvMap) -> Result<()> {
     let key = env_or(
         env,
         "EVGL_IDEMPOTENCY_KEY",
-        &format!("cli:{event_id}:{}:{}", target.provider, target.connection_id),
+        &format!(
+            "cli:{event_id}:{}:{}",
+            target.provider, target.connection_id
+        ),
     );
     let url = api.base.join(&format!("v1/events/{event_id}/cross-post"))?;
-    let mut request = api.http.post(url).header("idempotency-key", key).json(&json!({ "targets": [target] }));
+    let mut request = api
+        .http
+        .post(url)
+        .header("idempotency-key", key)
+        .json(&json!({ "targets": [target] }));
     if let Some(token) = &api.token {
         request = request.bearer_auth(token);
     }
@@ -278,7 +296,10 @@ async fn cross_post(api: &Api, env: &EnvMap) -> Result<()> {
 
 async fn job(api: &Api, env: &EnvMap) -> Result<()> {
     let id = required(env, "EVGL_JOB_ID")?;
-    print_json(api.request(Method::GET, &format!("/v1/jobs/{id}"), None).await?);
+    print_json(
+        api.request(Method::GET, &format!("/v1/jobs/{id}"), None)
+            .await?,
+    );
     Ok(())
 }
 
@@ -310,10 +331,9 @@ async fn watch_job(env: &EnvMap) -> Result<()> {
         .map_err(|_| anyhow::anyhow!("could not construct WebSocket URL"))?;
     let mut request = url.as_str().into_client_request()?;
     if let Some(token) = &api.token {
-        request.headers_mut().insert(
-            "authorization",
-            format!("Bearer {token}").parse()?,
-        );
+        request
+            .headers_mut()
+            .insert("authorization", format!("Bearer {token}").parse()?);
     }
     let (stream, _) = connect_async(request).await?;
     let (_, mut read) = stream.split();
@@ -403,7 +423,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn empty_and_whitespace_env_values_are_absent() {
         for raw in ["", " ", "\t"] {
             let env = EnvMap::from([("EVGL_OUTPUT".into(), raw.into())]);
@@ -412,6 +431,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn apply_cli_flags_merges_cli_over_base_env_without_mutation() {
         let before = std::env::var_os("EVGL_OUTPUT");
         let initial = EnvMap::from([("EVGL_OUTPUT".into(), "text".into())]);
