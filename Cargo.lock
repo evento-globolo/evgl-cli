@@ -210,7 +210,7 @@ checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
 [[package]]
 name = "flags2env"
 version = "0.1.0"
-source = "git+https://github.com/ORESoftware/flags-2-env?rev=b596f2d1c99bd726b262a923916e3015bc80bc37#b596f2d1c99bd726b262a923916e3015bc80bc37"
+source = "git+https://github.com/flags-2-env/flags-2-env?rev=b596f2d1c99bd726b262a923916e3015bc80bc37#b596f2d1c99bd726b262a923916e3015bc80bc37"
 dependencies = [
  "cc",
  "libloading",

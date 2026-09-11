@@ -11,7 +11,7 @@ publish = false
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 evgl-domain = { git = "https://github.com/evento-globolo/evgl-libs", rev = "de7e858f9707e32e1950bb645e424ff6308bca6a" }
-flags2env = { git = "https://github.com/ORESoftware/flags-2-env", rev = "b596f2d1c99bd726b262a923916e3015bc80bc37", package = "flags2env" }
+flags2env = { git = "https://github.com/flags-2-env/flags-2-env", rev = "b596f2d1c99bd726b262a923916e3015bc80bc37", package = "flags2env" }
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
