@@ -222,12 +222,26 @@ env-keygen: _env-dec
 
 # Fail-closed audit: no plaintext in git, gitignore intact, ciphertext valid.
 [group('env')]
-env-check: _env-dec
+env-check:
     #!/usr/bin/env bash
     set -euo pipefail
     cd {{ justfile_directory() }}
     fail=0
     note() { echo "  ✗ $1"; fail=1; }
+
+    # A read-only, key-independent audit must not bootstrap a plaintext
+    # directory or require ores-sops on a fresh CI runner. Retain the same
+    # symlink/type refusal as _env-dec BEFORE walking any secret-shaped paths.
+    for rel in env env/enc env/dec; do
+      if [[ -L $rel ]]; then
+        echo "  ✗ $rel must not be a symlink" >&2
+        exit 1
+      fi
+      if [[ -e $rel && ! -d $rel ]]; then
+        echo "  ✗ $rel must be a directory" >&2
+        exit 1
+      fi
+    done
 
     echo "tracked files:"
     # Dotenv-shaped secrets: `.env`, `.env.<anything>`, and anything under
